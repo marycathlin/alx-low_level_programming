@@ -2,40 +2,68 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+char *create_buffer(char *file);
+void close_file(int fd);
+
 /**
-  * error_file - checks if files can be opened.
-  * @file_from: file_from.
-  * @file_to: file_to.
-  * @argv: arguments vector.
-  * Return: no return.
+  * create_buffer - allocates 1024 bytes for buffer.
+  * @file: file buffer is storing characters for.
+  *
+  *
+  * Return: A poniter to a newly allocated buffer.
   */
-void error_file(int file_from, int file_to, char *argv[])
+char *create_buffer(char *file)
 {
-	if (file_from == -1)
+	char *buffer;
+
+	buffer = malloc(sizeof(char) * 1024);
+
+	if (buffer == NULL)
+
 	{
-		dprintf(STDERR_FILENO, "Error: can't read from file %s\n", argv[1]);
-		exit(98);
+		dprintf(STDERR_FILENO, "Error: can't write to %s\n", file);
+		exit(99);
 	}
-	if (file_to == -1)
+
+	return (buffer);
+
+}
+
+/**
+  * close_file - closes file descriptors.
+  * @fd: file to close.
+  */
+
+void close_file(int fd)
+{
+	int i;
+
+	i = close(fd);
+
+	if (i == -1)
 	{
-		dprintf(STDERR_FILENO, "Error: can't write to %s\n", argv[2]);
+		dprintf(STDERR_FILENO, "Error:can't close fd %d\n", fd);
 		exit(99);
 	}
 }
 
+
 /**
   * main - checks the code.
   * @argc: number of arguments.
-  * @argv: arguments vector.
-  * Return: Always 0.
+  * @argv: an array of pointers to the arguments.
+  * Description: if argument is not correct - exit code 97.
+  *              if file_from does not exist or can't be read - exit code 98.
+  *              if file_to can't be created or written to - exit code 99.
+  *              if file_to or file_from can't be clode - exit code 100.
+  * Return: 0 on success.
   */
 
 int main(int argc, char *argv[])
 {
-	int file_from, file_to, err_close;
-	ssize_t fchars, fwr;
+	int file_from, file_to, r, w;
+	char *buffer;
 
-	char buf[1024];
 
 	if (argc != 3)
 	{
@@ -43,33 +71,34 @@ int main(int argc, char *argv[])
 		exit(97);
 	}
 
+	buffer = create_buffer(argv[2]);
 	file_from = open(argv[1], O_RDONLY);
-	file_to = open(argv[2], O_CREAT | O_WRONLY | O_TRUNC | O_APPEND, 0664);
-	error_file(file_from, file_to, argv);
+	r = read(file_from, buffer, 1024);
+	file_to = open(argv[2], O_CREAT | O_WRONLY | O_TRUNC, 0664);
 
-	fchars = 1024;
-	while (fchars == 1024)
-	{
-		fchars = read(file_from, buf, 1024);
-		if (fchars == -1)
-			error_file(-1, 0, argv);
-		fwr = write(file_to, buf, fchars);
-		if (fwr == -1)
-			error_file(0, -1, argv);
-	}
+	do {
+		if (file_from == -1 || r == -1)
+		{
+			dprintf(STDERR_FILENO,
+					"Error: Can't read from file %s\n", argv[1]);
+			free(buffer);
+			exit(98);
+		}
+		w = write(file_to, buffer, r);
+		if (file_to == -1 || w == -1)
+		{
+			dprintf(STDERR_FILENO,
+					"Error: Can't write to %s\n", argv[2]);
+			free(buffer);
+			exit(99);
+		}
+		r = read(file_from, buffer, 1024);
+		file_to = open(argv[2], O_WRONLY | O_APPEND);
+	} while (r > 0);
 
-	err_close = close(file_from);
-	if (err_close == -1)
-	{
-		dprintf(STDERR_FILENO, "Error: can't close fd %d\n", file_from);
-		exit(100);
-	}
+	free(buffer);
+	close_file(file_from);
+	close_file(file_to);
 
-	err_close = close(file_to);
-	if (err_close == -1)
-	{
-		dprintf(STDERR_FILENO, "Error: can't close fd %d\n", file_from);
-		exit(100);
-	}
 	return (0);
 }
